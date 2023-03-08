@@ -35,7 +35,7 @@ pub enum InterpreterError {
 
 #[derive(Debug)]
 pub enum Outcome<'a> {
-    Advanced,
+    Advanced(&'a Model),
     WaitingForChoice(Vec<&'a Model>),
     Stopped,
     EndOfDialogue
@@ -144,8 +144,9 @@ impl Interpreter {
             .nth(index) {
             Some(choice) => {
                 self.cursor = Some(choice.properties.id.clone());
+                let model = self.get_current_model().unwrap();
 
-                Ok(Outcome::Advanced)
+                Ok(Outcome::Advanced(&model))
             },
             None => self.advance()
         }
@@ -197,7 +198,7 @@ impl Interpreter {
                             Outcome::WaitingForChoice(choices)
                         },
                         ModelType::Condition => return self.advance(),
-                        _ => Outcome::Advanced
+                        _ => Outcome::Advanced(&self.get_current_model().unwrap())
                     }
                 )
             },
@@ -256,7 +257,7 @@ impl Interpreter {
                             Outcome::WaitingForChoice(choices)
                         },
                         ModelType::Condition => return self.advance(),
-                        _ => Outcome::Advanced
+                        _ => Outcome::Advanced(&self.get_current_model().unwrap())
                     }
                 )
             },

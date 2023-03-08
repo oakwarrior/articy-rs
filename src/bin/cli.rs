@@ -76,7 +76,7 @@ fn main() {
                 interpreter.choose(choice).unwrap();
             },
             "" => match interpreter.advance().unwrap() {
-                Outcome::Advanced => {},
+                Outcome::Advanced(_) => {},
                 Outcome::WaitingForChoice(_choices) => {
                     display_choices(&interpreter)
                 },
