@@ -358,6 +358,12 @@ pub struct ModelProperties {
 #[serde(rename_all = "PascalCase")]
 pub struct Id(pub String);
 
+impl Id {
+    pub fn to_inner(&self) -> String {
+        self.0.to_owned()
+    }
+}
+
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
