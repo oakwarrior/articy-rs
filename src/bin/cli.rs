@@ -4,7 +4,7 @@
 use std::io;
 use io::Write;
 
-use articy::types::{self, ArticyFile, Pin, ModelType, Model};
+use articy::types::{self, ArticyFile, Pin, Id, Type, Model};
 use articy::{Interpreter, Outcome};
 
 use evalexpr::{
@@ -19,19 +19,26 @@ use evalexpr::{
 
 
 fn main() {
-    let json = std::fs::read_to_string("./example_project.json")
+    let json = std::fs::read_to_string("./craftcraft.json")
         .expect("to be able to read the file");
 
     let articy_file: ArticyFile = serde_json::from_str(&json)
         .expect("to be able to parse articy data");
 
+    // let start_id = Id("0x010000010000029F".into());
+    let start_id = articy_file
+        .get_default_package()
+        .unwrap()
+        .models
+        .first()
+        .unwrap()
+        .id();
+
     let mut interpreter = Interpreter::new(articy_file);
 
-    println!("RESULT: {}", eval_with_context_mut(r#"game.finished = false"#, &mut interpreter.state).unwrap());
+    // println!("RESULT: {}", eval_with_context_mut(r#"game.finished = false"#, &mut interpreter.state).unwrap());
 
     // DAY 1
-    let start_id = types::Id("0x010000000000188A".to_string());
-
     interpreter.start(start_id).unwrap();
 
     let stdin = io::stdin();
@@ -39,16 +46,18 @@ fn main() {
 
     'game: loop {
         let model = interpreter.get_current_model().unwrap();
+        let kind = format!("{model:?}");
+        let kind = kind.split('(').next().unwrap();
 
-        println!("ID: {:?}; Type: {:?}", interpreter.cursor.as_ref().unwrap(), model.model_type);
-        println!("{}", model.properties.text.as_ref().unwrap());
-        
+        println!("\x1b[38;2;100;100;100mID: {:?}; Type: {kind}\x1b[0m", interpreter.cursor.as_ref().unwrap());
+        println!("{}", model.text());
+
         // Wait for input
         write!(stdout, "\nPress any key to continue...\n").unwrap();
         stdout.flush().unwrap();
-        
+
+        // Read input into a buffer
         let mut buffer = String::new();
-        // Read a single byte and discard
         stdin.read_line(&mut buffer).unwrap();
 
         let buffer = buffer.to_lowercase();
@@ -72,7 +81,7 @@ fn main() {
                         continue
                     }
                 };
-                    
+
                 interpreter.choose(choice).unwrap();
             },
             "" => match interpreter.advance().unwrap() {
@@ -95,9 +104,8 @@ fn display_choices(interpreter: &Interpreter) {
     for model in models {
         println!(
             "({choice}): {node_name} {condition}",
-            condition = match model.properties.input_pins
-                .as_ref()
-                .unwrap()
+            condition = match model
+                .input_pins()
                 .first() // NOTE: Assuming that the first input pin is the one we care about
                 .unwrap()
                 .text.as_str() {
@@ -110,10 +118,10 @@ fn display_choices(interpreter: &Interpreter) {
                     format!("({expression} ({outcome}))")
                 }
             },
-            node_name = match model.model_type {
-                ModelType::DialogueFragment => model.properties.text.as_ref(),
-                _ => model.properties.display_name.as_ref()
-            }.unwrap_or(&"No Display name".to_string())
+            node_name = match model {
+                Model::DialogueFragment(fragment) => fragment.text.clone(),
+                _ => model.display_name()
+            }
         );
 
         choice += 1;
