@@ -375,7 +375,7 @@ impl Model {
             Model::Comment(Comment { id, .. }) |
             Model::Condition(Condition { id, .. }) |
             Model::UserFolder(UserFolder{ id, .. }) => id.clone(),
-            Model::Custom(..) => unimplemented!("No Id guaranteed inside of custom model, implement!")
+            Model::Custom(kind, _) => unimplemented!("No Id guaranteed inside of custom model: \"{kind}\", implement!")
         }
     }
 
