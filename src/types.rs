@@ -375,7 +375,7 @@ impl Model {
             Model::Comment(Comment { id, .. }) |
             Model::Condition(Condition { id, .. }) |
             Model::UserFolder(UserFolder{ id, .. }) => id.clone(),
-            Model::Custom(kind, _) => unimplemented!("No Id guaranteed inside of custom model: \"{kind}\", implement!")
+            Model::Custom(..) => unimplemented!("No Id guaranteed inside of custom model: {self:?}, implement!")
         }
     }
 
@@ -388,7 +388,7 @@ impl Model {
             Model::Comment(Comment { parent, .. }) |
             Model::Condition(Condition { parent, .. }) |
             Model::UserFolder(UserFolder{ parent, .. }) => parent.clone(),
-            Model::Custom(..) => unimplemented!("No Id guaranteed inside of custom model, implement!")
+            Model::Custom(..) => unimplemented!("No Id guaranteed inside of custom model {self:?}!")
         }
     }
 
@@ -416,7 +416,7 @@ impl Model {
             Model::DialogueFragment(_) |
             Model::UserFolder(_) | 
             Model::Comment(_) |
-            Model::Custom(..) => unimplemented!("No display_name guaranteed inside of {self:?}, implement!")
+            Model::Custom(..) => unimplemented!("No display_name guaranteed inside of {self:?}")
         }
     }
 
@@ -430,7 +430,7 @@ impl Model {
 
             Model::UserFolder(_) |
             Model::Comment(_) |
-            Model::Custom(..) => unimplemented!("No input_pin guaranteed in {self:?}, implement!")
+            Model::Custom(..) => unimplemented!("No input_pin guaranteed in {self:?}")
         }
     }
 
@@ -444,7 +444,7 @@ impl Model {
 
             Model::UserFolder(_) |
             Model::Comment(_) |
-            Model::Custom(..) => unimplemented!("No output_pin guaranteed in {self:?}, implement!")
+            Model::Custom(..) => unimplemented!("No output_pin guaranteed in {self:?}")
         }
     }
 

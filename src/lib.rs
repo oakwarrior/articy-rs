@@ -71,8 +71,7 @@ impl Interpreter {
         match self.get_current_model() {
             Ok(Model::FlowFragment(flow_fragment)) => {
                 let dialogue = self.file.get_dialogues_in_flow(&flow_fragment.id)
-                    .iter()
-                    .nth(2)
+                    .first()
                     .ok_or(Error::NoModel)?
                     .to_owned()
                     .clone();
