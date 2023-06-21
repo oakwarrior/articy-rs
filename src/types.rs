@@ -1,10 +1,11 @@
-#![allow(dead_code)]
-
+#[allow(unreachable_code)]
 use serde::de::Error as SerdeError;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use serde_enum_str::Deserialize_enum_str as DeserializeString;
+use serde_enum_str::{
+    Deserialize_enum_str as DeserializeString, Serialize_enum_str as SerializeString,
+};
 use strum_macros::IntoStaticStr;
 
 #[derive(Debug)]
@@ -21,8 +22,8 @@ pub enum Error {
     FailedToGetState,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct File {
     pub settings: Settings,
     pub project: Project,
@@ -117,8 +118,8 @@ impl File {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Settings {
     #[serde(rename(deserialize = "set_Localization"))]
     #[serde(deserialize_with = "string_to_bool")]
@@ -174,8 +175,8 @@ where
         .collect())
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Project {
     name: String,
     detail_name: String,
@@ -183,15 +184,15 @@ pub struct Project {
     technical_name: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct GlobalVariable {
     namespace: String,
     description: String,
     variables: Vec<Variable>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(try_from = "Value")]
 pub struct Variable {
     name: String,
@@ -267,14 +268,14 @@ impl TryFrom<Value> for Variable {
 }
 
 // TODO: Perhaps combine Type + Value together?
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub enum VariableType {
     Boolean,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub enum VariableValue {
     // TODO: Remove Unknown and add deserialization error to be exhaustive
     Unknown,
@@ -284,8 +285,8 @@ pub enum VariableValue {
     String(String),
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Object {
     pub class: Type,
     #[serde(rename(deserialize = "Type"))]
@@ -293,8 +294,8 @@ pub struct Object {
     pub properties: Option<Vec<ObjectProperty>>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct ObjectProperty {
     property: String,
     #[serde(rename(deserialize = "Type"))]
@@ -302,8 +303,8 @@ pub struct ObjectProperty {
     item_type: Option<Type>,
 }
 
-#[derive(DeserializeString, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(SerializeString, DeserializeString, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub enum Type {
     Rect,
     PreviewImageViewBoxModes,
@@ -358,8 +359,8 @@ pub enum Type {
     Custom(String),
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Package {
     pub name: String,
     pub description: String,
@@ -368,10 +369,14 @@ pub struct Package {
     pub models: Vec<Model>,
 }
 
-#[derive(Deserialize, Debug, Clone, IntoStaticStr)]
-#[serde(rename_all = "PascalCase", tag = "Type", content = "Properties")]
+#[derive(Serialize, Deserialize, Debug, Clone, IntoStaticStr)]
+#[serde(
+    rename_all(deserialize = "PascalCase"),
+    tag = "Type",
+    content = "Properties"
+)]
 pub enum Model {
-    #[serde(rename_all = "PascalCase")]
+    #[serde(rename_all(deserialize = "PascalCase"))]
     DialogueFragment {
         id: Id,
         parent: Id,
@@ -393,7 +398,7 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all = "PascalCase")]
+    #[serde(rename_all(deserialize = "PascalCase"))]
     Hub {
         id: Id,
         parent: Id,
@@ -412,7 +417,7 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all = "PascalCase")]
+    #[serde(rename_all(deserialize = "PascalCase"))]
     FlowFragment {
         parent: Id,
         id: Id,
@@ -433,7 +438,7 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all = "PascalCase")]
+    #[serde(rename_all(deserialize = "PascalCase"))]
     Dialogue {
         id: Id,
         parent: Id,
@@ -453,7 +458,7 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all = "PascalCase")]
+    #[serde(rename_all(deserialize = "PascalCase"))]
     Comment {
         id: Id,
         parent: Id,
@@ -471,7 +476,7 @@ pub enum Model {
         short_id: ShortId,
     },
 
-    #[serde(rename_all = "PascalCase")]
+    #[serde(rename_all(deserialize = "PascalCase"))]
     Condition {
         id: Id,
         parent: Id,
@@ -490,7 +495,7 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all = "PascalCase")]
+    #[serde(rename_all(deserialize = "PascalCase"))]
     UserFolder {
         id: Id,
         parent: Id,
@@ -622,8 +627,8 @@ impl Model {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Id(pub String);
 
 impl Id {
@@ -632,23 +637,23 @@ impl Id {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Author(pub String);
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Attachment;
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct PreviewImage {
     view_box: Rectangle,
     mode: PreviewImageMode,
     asset: AssetId,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Rectangle {
     x: f32,
     y: f32,
@@ -656,41 +661,41 @@ pub struct Rectangle {
     h: f32,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum PreviewImageMode {
     FromAsset,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AssetId(String);
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Color {
     r: f32,
     g: f32,
     b: f32,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExternalId(String);
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Point {
     x: f32,
     y: f32,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Size {
     w: f32,
     h: f32,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ShortId(u32);
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Pin {
     pub text: String,
     pub id: Id,
@@ -701,18 +706,18 @@ pub struct Pin {
     pub connections: Vec<Connection>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Connection {
     pub label: String,
     pub target_pin: Id,
     pub target: Id,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ScriptMethod;
 
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum NodeType {
     Unknown,
 
@@ -726,8 +731,8 @@ pub enum NodeType {
     Assets,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "PascalCase")]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Hierarchy {
     pub id: Id,
     pub technical_name: String,
