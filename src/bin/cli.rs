@@ -25,7 +25,10 @@ fn main() {
         .unwrap()
         .id();
 
+    let start_id = Id("0x0100000100000481".into());
+
     let mut interpreter = Interpreter::new(articy_file.into());
+    interpreter.set_state("quality.groundskeeper_dagger", articy::StateValue::Int(2));
 
     // println!("RESULT: {}", eval_with_context_mut(r#"game.finished = false"#, &mut interpreter.state).unwrap());
 

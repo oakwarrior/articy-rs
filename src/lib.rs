@@ -277,22 +277,23 @@ impl Interpreter {
                     _ => false,
                 };
 
-                let connections = &output_pins
-                    .first()
-                    .ok_or(Error::NoOutputConnected)?
-                    .connections;
-
                 println!("[Condition] Input ({expression}); Outcome: {result}\n");
 
                 self.cursor = Some(if result {
-                    connections
+                    output_pins
+                        .first()
+                        .ok_or(Error::NoOutputConnected)?
+                        .connections
                         .first()
                         .ok_or(Error::NoOutputConnected)?
                         .target
                         .clone()
                 } else {
-                    connections
+                    output_pins
                         .last()
+                        .ok_or(Error::NoOutputConnected)?
+                        .connections
+                        .first()
                         .ok_or(Error::NoOutputConnected)?
                         .target
                         .clone()
