@@ -15,7 +15,7 @@ pub struct Interpreter {
     pub cursor: Option<Id>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Outcome<'a> {
     Advanced(&'a Model),
     WaitingForChoice(Vec<&'a Model>),
@@ -211,22 +211,6 @@ impl Interpreter {
         }
     }
 
-    pub fn post_advance(&mut self) -> Result<Outcome, Error> {
-        Ok(match self.get_current_model().ok().ok_or(Error::NoModel)? {
-            Model::Dialogue { .. } => Outcome::EndOfDialogue,
-            Model::Hub { .. } => {
-                let choices = self
-                    .get_available_connections()
-                    .ok()
-                    .ok_or(Error::NoOutputConnected)?;
-
-                Outcome::WaitingForChoice(choices)
-            }
-            Model::Condition { .. } => return self.advance(),
-            _ => Outcome::Advanced(self.get_current_model().ok().ok_or(Error::NoModel)?),
-        })
-    }
-
     pub fn advance(&mut self) -> Result<Outcome, Error> {
         let cursor = self.cursor.as_ref().ok_or(Error::NoCursor)?;
         let model = self
@@ -302,6 +286,34 @@ impl Interpreter {
                 self.post_advance()
             }
             kind => unimplemented!("Forgot to implement type {kind:?} for Interpreter::advance"),
+        }
+    }
+
+    pub fn post_advance(&mut self) -> Result<Outcome, Error> {
+        Ok(match self.get_current_model().ok().ok_or(Error::NoModel)? {
+            Model::Dialogue { .. } => Outcome::EndOfDialogue,
+            Model::Hub { .. } => {
+                let choices = self
+                    .get_available_connections()
+                    .ok()
+                    .ok_or(Error::NoOutputConnected)?;
+
+                Outcome::WaitingForChoice(choices)
+            }
+            Model::Condition { .. } => return self.advance(),
+            _ => Outcome::Advanced(self.get_current_model().ok().ok_or(Error::NoModel)?),
+        })
+    }
+
+    /// Goes through all of the nodes until meeting some that force it to stop,
+    /// will not tell you what outcome though since that would require looping with a &mut self 😓
+    pub fn exhaust_maximally(&mut self) -> Result<(), Error> {
+        loop {
+            match self.advance()? {
+                // TODO: If there are any state changes applied due to specific node types, be sure to apply them here as well?
+                Outcome::Advanced(..) => continue,
+                _ => break Ok(()),
+            }
         }
     }
 }
