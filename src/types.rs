@@ -447,6 +447,7 @@ pub enum Model {
         preview_image: PreviewImage,
         attachments: Vec<Attachment>,
         display_name: String,
+        external_id: Id,
         text: String,
         color: Color,
         position: Point,
@@ -483,6 +484,7 @@ pub enum Model {
         technical_name: String,
 
         display_name: String,
+        external_id: Id,
         text: String,
         expression: String,
         color: Color,
@@ -500,6 +502,7 @@ pub enum Model {
         id: Id,
         parent: Id,
         technical_name: String,
+        external_id: Id,
     },
 
     Custom(String, Value),
@@ -552,6 +555,26 @@ impl Model {
                     None => Id("Custom Model did not have Id".to_owned()),
                 },
                 None => Id("Custom Model did not have Id".to_owned()),
+            },
+        }
+    }
+
+    pub fn external_id(&self) -> Id {
+        match self {
+            Model::FlowFragment { external_id, .. }
+            | Model::DialogueFragment { external_id, .. }
+            | Model::Hub { external_id, .. }
+            | Model::Dialogue { external_id, .. }
+            | Model::Comment { external_id, .. }
+            | Model::Condition { external_id, .. }
+            | Model::UserFolder { external_id, .. } => external_id.clone(),
+
+            Model::Custom(_, value) => match value.get("ExternalId") {
+                Some(value) => match value.as_str() {
+                    Some(external_id) => Id(external_id.to_owned()),
+                    None => Id("Custom Model did not have external_id".to_owned()),
+                },
+                None => Id("Custom Model did not have external_id".to_owned()),
             },
         }
     }
