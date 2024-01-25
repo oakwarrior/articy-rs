@@ -2,6 +2,7 @@
 use serde::de::Error as SerdeError;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 use serde_enum_str::{
     Deserialize_enum_str as DeserializeString, Serialize_enum_str as SerializeString,
@@ -32,9 +33,20 @@ pub struct File {
     pub packages: Vec<Package>,
     pub script_methods: Vec<ScriptMethod>,
     pub hierarchy: Hierarchy,
+
+    #[serde(skip)]
+    raw_bytes: Vec<u8>,
 }
 
 impl File {
+    pub fn from_buffer(bytes: &Vec<u8>) -> Self {
+        let mut file: Self =
+            serde_json::from_slice(bytes).expect("to be able to parse articy data");
+        file.raw_bytes = bytes.clone();
+
+        file
+    }
+
     pub fn get_default_package(&self) -> &Package {
         self.packages
             .iter()
@@ -61,6 +73,14 @@ impl File {
                 Model::Custom(custom_kind, _) => custom_kind == kind,
                 _ => kind == Into::<&str>::into(*model),
             })
+            .collect::<Vec<&Model>>()
+    }
+
+    pub fn get_models(&self) -> Vec<&Model> {
+        // FIXME: Perhaps iterate ALL of the available packages instead of assuming only one
+        self.get_default_package()
+            .models
+            .iter()
             .collect::<Vec<&Model>>()
     }
 
@@ -100,16 +120,22 @@ impl File {
         let mut path = vec![model.id(), model.parent()];
         let mut cursor = model.parent();
 
+        println!("model: {model:#?} with id {:?}", model.parent());
+
         while &cursor != main_flow_id {
             let model = self
                 .get_default_package()
                 .models
                 .iter()
-                .find(|model| model.id() == cursor)
-                .ok_or(Error::NoModel)?;
+                .find(|model| model.id() == cursor);
+            // .ok_or(Error::NoModel)?;
 
-            path.push(model.parent());
-            cursor = model.parent()
+            if let Some(model) = model {
+                path.push(model.parent());
+                cursor = model.parent()
+            } else {
+                break;
+            }
         }
 
         path.reverse();
@@ -396,6 +422,8 @@ pub enum Model {
 
         input_pins: Vec<Pin>,
         output_pins: Vec<Pin>,
+
+        template: Option<HashMap<String, Value>>,
     },
 
     #[serde(rename_all(deserialize = "PascalCase"))]
@@ -519,6 +547,21 @@ where
         .iter()
         .map(|item| {
             // NOTE: This code makes sure that a Model can fallback to a Custom, if you notice certain models going Custom that shouldn't (e.g they're part of the Model enum list), log the `_error` and check the error message.
+
+            let item = if let Some(template) = item.get("Template") {
+                let mut item = item.clone();
+
+                item.get_mut("Properties")
+                    .unwrap()
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("Template".to_owned(), template.clone());
+
+                item
+            } else {
+                item.to_owned()
+            };
+
             serde_json::from_value(item.clone()).unwrap_or_else(|_error| {
                 let properties = item
                     .get("Properties")

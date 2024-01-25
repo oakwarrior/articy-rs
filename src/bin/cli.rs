@@ -17,21 +17,18 @@ fn main() {
 
     let articy_file: File = serde_json::from_str(&json).expect("to be able to parse articy data");
 
-    // let start_id = Id("0x010000010000029F".into());
-    let start_id = articy_file
-        .get_default_package()
-        .models
-        .first()
-        .unwrap()
-        .id();
-
-    let start_id = Id("0x0100000100000481".into());
+    let start_id = Id("0x0100000100000529".into());
 
     let mut interpreter = Interpreter::new(articy_file.into());
-    interpreter.set_state("quality.groundskeeper_dagger", articy::StateValue::Int(2));
+    // let _ = interpreter.set_state("quality.groundskeeper_dagger", articy::StateValue::Int(2));
+    let _ = interpreter.set_state(
+        "item_selection.daywatch_weapon_choice",
+        articy::StateValue::Boolean(false),
+    );
 
     // println!("RESULT: {}", eval_with_context_mut(r#"game.finished = false"#, &mut interpreter.state).unwrap());
 
+    println!("Starting with state:\n{:#?}\n---\n", interpreter.state);
     // DAY 1
     interpreter.start(start_id).unwrap();
 
@@ -44,10 +41,10 @@ fn main() {
         let kind = kind.split('(').next().unwrap();
 
         println!(
-            "\x1b[38;2;100;100;100mID: {:?}; Type: {kind}\x1b[0m",
+            "ID: {:?}; Type: {kind:?}\n",
             interpreter.cursor.as_ref().unwrap()
         );
-        println!("{}", model.text().unwrap());
+        println!("Text: {}", model.text().unwrap());
 
         // Wait for input
         write!(stdout, "\nPress any key to continue...\n").unwrap();

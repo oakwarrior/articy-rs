@@ -78,12 +78,12 @@ impl Interpreter {
                     .as_ref()
                     .ok_or(Error::NoHierarchy)?
                     .iter()
-                    .find(|node| {
-                        if let Type::DialogueFragment = node.kind {
-                            true
-                        } else {
-                            false
-                        }
+                    .find(|node| match node.kind {
+                        Type::DialogueFragment
+                        | Type::Condition
+                        | Type::Hub
+                        | Type::FlowFragment => true,
+                        _ => false,
                     })
                     .ok_or(Error::NoHierarchy)?
                     .id
@@ -104,12 +104,12 @@ impl Interpreter {
                     .as_ref()
                     .ok_or(Error::NoHierarchy)?
                     .iter()
-                    .find(|node| {
-                        if let Type::DialogueFragment = node.kind {
-                            true
-                        } else {
-                            false
-                        }
+                    .find(|node| match node.kind {
+                        Type::DialogueFragment
+                        | Type::Condition
+                        | Type::Hub
+                        | Type::FlowFragment => true,
+                        _ => false,
                     })
                     .ok_or(Error::NoHierarchy)?
                     .id
@@ -189,13 +189,13 @@ impl Interpreter {
             .filter_map(|choice| {
                 let expression = &choice.input_pins()?.first()?.text;
 
-                if let Ok(expression_is_true) = eval_boolean_with_context(expression, &self.state) {
-                    if expression_is_true {
-                        return Some(choice);
-                    }
+                match (
+                    expression.is_empty(),
+                    eval_boolean_with_context(expression, &self.state),
+                ) {
+                    (true, _) | (false, Ok(true)) => Some(choice),
+                    _ => None,
                 }
-
-                None
             })
             .find(|choice| choice.id() == id)
         {
@@ -224,16 +224,30 @@ impl Interpreter {
         match model {
             Model::Dialogue { .. } => Ok(Outcome::EndOfDialogue),
             Model::DialogueFragment { output_pins, .. } => {
-                self.cursor = Some(
-                    output_pins
-                        .first()
-                        .ok_or(Error::NoOutputConnected)?
-                        .connections
-                        .first()
-                        .ok_or(Error::NoOutputConnected)?
-                        .target
-                        .clone(),
-                );
+                let connections = self
+                    .get_available_connections()
+                    .ok()
+                    .ok_or(Error::NoOutputConnected)?
+                    .len();
+
+                if connections > 1 {
+                    return Ok(Outcome::WaitingForChoice(
+                        self.get_available_connections()
+                            .ok()
+                            .ok_or(Error::NoOutputConnected)?,
+                    ));
+                } else {
+                    self.cursor = Some(
+                        output_pins
+                            .first()
+                            .ok_or(Error::NoOutputConnected)?
+                            .connections
+                            .first()
+                            .ok_or(Error::NoOutputConnected)?
+                            .target
+                            .clone(),
+                    );
+                }
 
                 self.post_advance()
             }
@@ -261,7 +275,7 @@ impl Interpreter {
                     _ => false,
                 };
 
-                println!("[Condition] Input ({expression}); Outcome: {result}\n");
+                println!("[Condition] Input ({expression}); Outcome: {result}");
 
                 self.cursor = Some(if result {
                     output_pins
