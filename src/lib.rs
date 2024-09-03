@@ -92,29 +92,9 @@ impl Interpreter {
                 self.cursor = Some(start_dialogue_fragment_id);
             }
             Ok(Model::Dialogue { .. }) => {
-                let path = self
-                    .file
-                    .get_hierarchy_path_from_model(self.get_current_model()?)?;
-
                 let start_dialogue_fragment_id = self
                     .file
-                    .get_hierarchy(path)
-                    .ok_or(Error::NoHierarchy)?
-                    .children
-                    .as_ref()
-                    .ok_or(Error::NoHierarchy)?
-                    .iter()
-                    .find(|node| match node.kind {
-                        Type::DialogueFragment
-                        | Type::Condition
-                        | Type::Hub
-                        | Type::FlowFragment => true,
-                        _ => false,
-                    })
-                    .ok_or(Error::NoHierarchy)?
-                    .id
-                    .clone();
-
+                    .get_first_dialogue_fragment_of_dialogue(self.get_current_model().unwrap())?;
                 self.cursor = Some(start_dialogue_fragment_id);
             }
             Ok(_) => {}
@@ -136,9 +116,24 @@ impl Interpreter {
             .ok_or(Error::NoModel)?)
     }
 
-    pub fn get_available_connections(&self) -> Result<Vec<&Model>, Error> {
+    pub fn get_model(&self, id: Id) -> Result<&Model, Error> {
         Ok(self
-            .get_current_model()?
+            .file
+            .get_default_package()
+            .models
+            .iter()
+            .find(|model| model.id() == id)
+            .ok_or(Error::NoModel)?)
+    }
+
+    pub fn get_available_connections_at_cursor(&self) -> Result<Vec<&Model>, Error> {
+        let cursor = self.cursor.as_ref().ok_or(Error::NoCursor)?;
+        self.get_available_connections(cursor)
+    }
+    pub fn get_available_connections(&self, model_id: &Id) -> Result<Vec<&Model>, Error> {
+        let model = self.get_model(model_id.clone())?;
+
+        Ok(model
             .output_pins()
             .expect("Model to have output pins")
             .iter()
@@ -182,7 +177,7 @@ impl Interpreter {
 
     pub fn choose(&mut self, id: Id) -> Result<Outcome, Error> {
         match self
-            .get_available_connections()
+            .get_available_connections_at_cursor()
             .ok()
             .ok_or(Error::NoOutputConnected)?
             .iter()
@@ -225,14 +220,14 @@ impl Interpreter {
             Model::Dialogue { .. } => Ok(Outcome::EndOfDialogue),
             Model::DialogueFragment { output_pins, .. } => {
                 let connections = self
-                    .get_available_connections()
+                    .get_available_connections_at_cursor()
                     .ok()
                     .ok_or(Error::NoOutputConnected)?
                     .len();
 
                 if connections > 1 {
                     return Ok(Outcome::WaitingForChoice(
-                        self.get_available_connections()
+                        self.get_available_connections_at_cursor()
                             .ok()
                             .ok_or(Error::NoOutputConnected)?,
                     ));
@@ -254,7 +249,7 @@ impl Interpreter {
             // Serves as a point for choices
             Model::Hub { .. } => {
                 let choices = self
-                    .get_available_connections()
+                    .get_available_connections_at_cursor()
                     .ok()
                     .ok_or(Error::NoOutputConnected)?;
 
@@ -308,7 +303,7 @@ impl Interpreter {
             Model::Dialogue { .. } => Outcome::EndOfDialogue,
             Model::Hub { .. } => {
                 let choices = self
-                    .get_available_connections()
+                    .get_available_connections_at_cursor()
                     .ok()
                     .ok_or(Error::NoOutputConnected)?;
 

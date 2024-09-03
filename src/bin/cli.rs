@@ -73,7 +73,7 @@ fn main() {
                 };
 
                 let id = match interpreter
-                    .get_available_connections()
+                    .get_available_connections_at_cursor()
                     .unwrap_or_default()
                     .iter()
                     .nth(choice)
@@ -98,7 +98,7 @@ fn main() {
 }
 
 fn display_choices(interpreter: &Interpreter) {
-    let models = interpreter.get_available_connections().unwrap();
+    let models = interpreter.get_available_connections_at_cursor().unwrap();
 
     let mut choice = 0;
     println!("\nAvailable choices:\n---");

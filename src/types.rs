@@ -1,7 +1,7 @@
 #[allow(unreachable_code)]
 use serde::de::Error as SerdeError;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 
 use serde_enum_str::{
@@ -24,7 +24,6 @@ pub enum Error {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct File {
     pub settings: Settings,
     pub project: Project,
@@ -33,18 +32,17 @@ pub struct File {
     pub packages: Vec<Package>,
     pub script_methods: Vec<ScriptMethod>,
     pub hierarchy: Hierarchy,
-
-    #[serde(skip)]
-    raw_bytes: Vec<u8>,
 }
 
 impl File {
     pub fn from_buffer(bytes: &Vec<u8>) -> Self {
-        let mut file: Self =
-            serde_json::from_slice(bytes).expect("to be able to parse articy data");
-        file.raw_bytes = bytes.clone();
-
-        file
+        serde_json::from_value(Value::Object(convert_map_to_snake_case(
+            serde_json::from_slice::<Value>(bytes)
+                .expect("to be able to parse articy data into serde_json Value")
+                .as_object()
+                .expect("the articy data to be an object at the root"),
+        )))
+        .expect("to parse snake cased articy data as a File")
     }
 
     pub fn get_default_package(&self) -> &Package {
@@ -120,8 +118,6 @@ impl File {
         let mut path = vec![model.id(), model.parent()];
         let mut cursor = model.parent();
 
-        println!("model: {model:#?} with id {:?}", model.parent());
-
         while &cursor != main_flow_id {
             let model = self
                 .get_default_package()
@@ -142,19 +138,36 @@ impl File {
 
         Ok(path)
     }
+
+    pub fn get_first_dialogue_fragment_of_dialogue(&self, model: &Model) -> Result<Id, Error> {
+        let path = self.get_hierarchy_path_from_model(model)?;
+
+        let start_dialogue_fragment_id = self
+            .get_hierarchy(path)
+            .ok_or(Error::NoHierarchy)?
+            .children
+            .as_ref()
+            .ok_or(Error::NoHierarchy)?
+            .iter()
+            .find(|node| match node.kind {
+                Type::DialogueFragment | Type::Condition | Type::Hub | Type::FlowFragment => true,
+                _ => false,
+            })
+            .ok_or(Error::NoHierarchy)?
+            .id
+            .clone();
+
+        Ok(start_dialogue_fragment_id)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Settings {
-    #[serde(rename(deserialize = "set_Localization"))]
     #[serde(deserialize_with = "string_to_bool")]
     set_localization: bool,
     // set_text_formatter: String?
-    #[serde(rename(deserialize = "set_IncludedNodes"))]
     #[serde(deserialize_with = "string_list_to_node_type_vector")]
     set_included_nodes: Vec<NodeType>,
-    #[serde(rename(deserialize = "set_UseScriptSupport"))]
     #[serde(deserialize_with = "string_to_bool")]
     set_use_script_support: bool,
     export_version: String,
@@ -164,7 +177,8 @@ fn string_to_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: Deserializer<'de>,
 {
-    match Deserialize::deserialize(deserializer)? {
+    let string: String = Deserialize::deserialize(deserializer)?;
+    match string.as_ref() {
         "True" | "true" => Ok(true),
         "False" | "false" => Ok(false),
         // TODO: Implement a proper Result::Err return value, instead of defaulting to false
@@ -179,7 +193,7 @@ fn string_list_to_node_type_vector<'de, D>(deserializer: D) -> Result<Vec<NodeTy
 where
     D: Deserializer<'de>,
 {
-    let string: &str = Deserialize::deserialize(deserializer)?;
+    let string: String = Deserialize::deserialize(deserializer)?;
 
     Ok(string
         .split(",")
@@ -202,7 +216,6 @@ where
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Project {
     name: String,
     detail_name: String,
@@ -211,7 +224,6 @@ pub struct Project {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct GlobalVariable {
     namespace: String,
     description: String,
@@ -251,21 +263,21 @@ impl TryFrom<Value> for Variable {
 
     fn try_from(value: Value) -> Result<Variable, Self::Error> {
         let variable_value = value
-            .get("Value")
+            .get("value")
             .ok_or(DeserializationError::KeyNotFound)?
             .as_str()
             .ok_or(DeserializationError::UnexpectedType)?;
 
         Ok(Variable {
             name: value
-                .get("Variable")
+                .get("variable")
                 .ok_or(DeserializationError::KeyNotFound)?
                 .as_str()
                 .ok_or(DeserializationError::UnexpectedType)?
                 .to_string(),
 
             value: match value
-                .get("Type")
+                .get("type")
                 .ok_or(DeserializationError::KeyNotFound)?
                 .as_str()
                 .ok_or(DeserializationError::UnexpectedType)?
@@ -284,7 +296,7 @@ impl TryFrom<Value> for Variable {
             },
 
             description: value
-                .get("Description")
+                .get("description")
                 .ok_or(DeserializationError::KeyNotFound)?
                 .as_str()
                 .ok_or(DeserializationError::UnexpectedType)?
@@ -295,13 +307,11 @@ impl TryFrom<Value> for Variable {
 
 // TODO: Perhaps combine Type + Value together?
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub enum VariableType {
     Boolean,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub enum VariableValue {
     // TODO: Remove Unknown and add deserialization error to be exhaustive
     Unknown,
@@ -312,25 +322,22 @@ pub enum VariableValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Object {
     pub class: Type,
-    #[serde(rename(deserialize = "Type"))]
+    #[serde(rename(deserialize = "type"))]
     pub kind: Type,
     pub properties: Option<Vec<ObjectProperty>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct ObjectProperty {
     property: String,
-    #[serde(rename(deserialize = "Type"))]
+    #[serde(rename(deserialize = "type"))]
     property_type: Type,
     item_type: Option<Type>,
 }
 
 #[derive(SerializeString, DeserializeString, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub enum Type {
     Rect,
     PreviewImageViewBoxModes,
@@ -386,7 +393,6 @@ pub enum Type {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Package {
     pub name: String,
     pub description: String,
@@ -397,12 +403,11 @@ pub struct Package {
 
 #[derive(Serialize, Deserialize, Debug, Clone, IntoStaticStr)]
 #[serde(
-    rename_all(deserialize = "PascalCase"),
-    tag = "Type",
-    content = "Properties"
+//     // // rename_all(deserialize = "PascalCase"),
+    tag = "type",
+    content = "properties"
 )]
 pub enum Model {
-    #[serde(rename_all(deserialize = "PascalCase"))]
     DialogueFragment {
         id: Id,
         parent: Id,
@@ -426,7 +431,6 @@ pub enum Model {
         template: Option<HashMap<String, Value>>,
     },
 
-    #[serde(rename_all(deserialize = "PascalCase"))]
     Hub {
         id: Id,
         parent: Id,
@@ -445,7 +449,6 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all(deserialize = "PascalCase"))]
     FlowFragment {
         parent: Id,
         id: Id,
@@ -466,7 +469,6 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all(deserialize = "PascalCase"))]
     Dialogue {
         id: Id,
         parent: Id,
@@ -482,12 +484,27 @@ pub enum Model {
         size: Size,
         z_index: f32,
         short_id: ShortId,
-
         input_pins: Vec<Pin>,
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all(deserialize = "PascalCase"))]
+    Entity {
+        id: Id,
+        parent: Id,
+        technical_name: String,
+
+        preview_image: PreviewImage,
+        attachments: Vec<Attachment>,
+        display_name: String,
+        external_id: Id,
+        text: String,
+        color: Color,
+        position: Point,
+        size: Size,
+        z_index: f32,
+        short_id: ShortId,
+    },
+
     Comment {
         id: Id,
         parent: Id,
@@ -505,7 +522,6 @@ pub enum Model {
         short_id: ShortId,
     },
 
-    #[serde(rename_all(deserialize = "PascalCase"))]
     Condition {
         id: Id,
         parent: Id,
@@ -525,7 +541,6 @@ pub enum Model {
         output_pins: Vec<Pin>,
     },
 
-    #[serde(rename_all(deserialize = "PascalCase"))]
     UserFolder {
         id: Id,
         parent: Id,
@@ -534,6 +549,44 @@ pub enum Model {
     },
 
     Custom(String, Value),
+}
+
+use convert_case::{Case, Casing};
+
+fn convert_map_to_snake_case(map: &Map<String, Value>) -> Map<String, Value> {
+    let mut tmp = Vec::with_capacity(map.len());
+    let mut new_map = Map::new();
+    for (key, val) in map.into_iter() {
+        tmp.push((key.to_case(Case::Snake), val));
+    }
+    for (key, val) in tmp {
+        match val {
+            Value::Object(object) => {
+                new_map.insert(key, Value::Object(convert_map_to_snake_case(object)));
+            }
+            Value::Array(array) => {
+                new_map.insert(
+                    key,
+                    Value::Array(
+                        array
+                            .into_iter()
+                            .map(|value| match value {
+                                Value::Object(object) => {
+                                    Value::Object(convert_map_to_snake_case(object))
+                                }
+                                _ => value.clone(),
+                            })
+                            .collect::<Vec<Value>>(),
+                    ),
+                );
+            }
+            _ => {
+                new_map.insert(key, val.clone());
+            }
+        }
+    }
+
+    new_map
 }
 
 fn deserialize_model<'de, D>(deserializer: D) -> Result<Vec<Model>, D::Error>
@@ -548,14 +601,14 @@ where
         .map(|item| {
             // NOTE: This code makes sure that a Model can fallback to a Custom, if you notice certain models going Custom that shouldn't (e.g they're part of the Model enum list), log the `_error` and check the error message.
 
-            let item = if let Some(template) = item.get("Template") {
+            let item = if let Some(template) = item.get("template") {
                 let mut item = item.clone();
 
-                item.get_mut("Properties")
+                item.get_mut("properties")
                     .unwrap()
                     .as_object_mut()
                     .unwrap()
-                    .insert("Template".to_owned(), template.clone());
+                    .insert("template".to_owned(), template.clone());
 
                 item
             } else {
@@ -563,19 +616,23 @@ where
             };
 
             serde_json::from_value(item.clone()).unwrap_or_else(|_error| {
-                let properties = item
-                    .get("Properties")
-                    .expect("Properties to be part of a Model Value")
-                    .clone();
+                // println!("ERROR: {:?} {error:#?}", item.get("type"));
+                let properties = convert_map_to_snake_case(
+                    item.get("properties")
+                        .expect("properties to be part of a Model Value")
+                        .clone()
+                        .as_object()
+                        .unwrap(),
+                );
 
                 let kind = item
-                    .get("Type")
+                    .get("type")
                     .expect("Type to be part of a Model Value")
                     .as_str()
                     .expect("Type to be of type &str")
                     .to_owned();
 
-                Model::Custom(kind, properties)
+                Model::Custom(kind, Value::Object(properties))
             })
         })
         .collect::<Vec<Model>>())
@@ -590,9 +647,10 @@ impl Model {
             | Model::Dialogue { id, .. }
             | Model::Comment { id, .. }
             | Model::Condition { id, .. }
-            | Model::UserFolder { id, .. } => id.clone(),
+            | Model::UserFolder { id, .. }
+            | Model::Entity { id, .. } => id.clone(),
 
-            Model::Custom(_, value) => match value.get("Id") {
+            Model::Custom(_, value) => match value.get("id") {
                 Some(value) => match value.as_str() {
                     Some(id) => Id(id.to_owned()),
                     None => Id("Custom Model did not have Id".to_owned()),
@@ -610,9 +668,10 @@ impl Model {
             | Model::Dialogue { external_id, .. }
             | Model::Comment { external_id, .. }
             | Model::Condition { external_id, .. }
-            | Model::UserFolder { external_id, .. } => external_id.clone(),
+            | Model::UserFolder { external_id, .. }
+            | Model::Entity { external_id, .. } => external_id.clone(),
 
-            Model::Custom(_, value) => match value.get("ExternalId") {
+            Model::Custom(_, value) => match value.get("external_id") {
                 Some(value) => match value.as_str() {
                     Some(external_id) => Id(external_id.to_owned()),
                     None => Id("Custom Model did not have external_id".to_owned()),
@@ -630,9 +689,10 @@ impl Model {
             | Model::Dialogue { parent, .. }
             | Model::Comment { parent, .. }
             | Model::Condition { parent, .. }
+            | Model::Entity { parent, .. }
             | Model::UserFolder { parent, .. } => parent.clone(),
 
-            Model::Custom(_, value) => match value.get("Parent") {
+            Model::Custom(_, value) => match value.get("parent") {
                 Some(value) => match value.as_str() {
                     Some(id) => Id(id.to_owned()),
                     None => Id("Custom Model did not have Parent Id".to_owned()),
@@ -649,6 +709,7 @@ impl Model {
             | Model::Hub { text, .. }
             | Model::Dialogue { text, .. }
             | Model::Comment { text, .. }
+            | Model::Entity { text, .. }
             | Model::Condition { text, .. } => Some(text.to_string()),
             Model::UserFolder { .. } | Model::Custom(..) => None,
         }
@@ -659,6 +720,7 @@ impl Model {
             Model::FlowFragment { display_name, .. }
             | Model::Hub { display_name, .. }
             | Model::Dialogue { display_name, .. }
+            | Model::Entity { display_name, .. }
             | Model::Condition { display_name, .. } => Some(display_name.to_string()),
 
             Model::DialogueFragment { .. }
@@ -676,7 +738,10 @@ impl Model {
             | Model::Dialogue { input_pins, .. }
             | Model::Condition { input_pins, .. } => Some(input_pins),
 
-            Model::UserFolder { .. } | Model::Comment { .. } | Model::Custom(..) => None,
+            Model::UserFolder { .. }
+            | Model::Comment { .. }
+            | Model::Entity { .. }
+            | Model::Custom(..) => None,
         }
     }
 
@@ -688,13 +753,15 @@ impl Model {
             | Model::Dialogue { output_pins, .. }
             | Model::Condition { output_pins, .. } => Some(output_pins),
 
-            Model::UserFolder { .. } | Model::Comment { .. } | Model::Custom(..) => None,
+            Model::UserFolder { .. }
+            | Model::Entity { .. }
+            | Model::Comment { .. }
+            | Model::Custom(..) => None,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Id(pub String);
 
 impl Id {
@@ -704,15 +771,12 @@ impl Id {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Author(pub String);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Attachment;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct PreviewImage {
     view_box: Rectangle,
     mode: PreviewImageMode,
@@ -761,19 +825,16 @@ pub struct Size {
 pub struct ShortId(u32);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Pin {
     pub text: String,
     pub id: Id,
     pub owner: Id,
-
     // NOTE: Sometimes certain pins don't have connections, default to an empty Vec<Connection> then (vec![])
     #[serde(default)]
     pub connections: Vec<Connection>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Connection {
     pub label: String,
     pub target_pin: Id,
@@ -798,11 +859,10 @@ pub enum NodeType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all(deserialize = "PascalCase"))]
 pub struct Hierarchy {
     pub id: Id,
     pub technical_name: String,
-    #[serde(rename(deserialize = "Type"))]
+    #[serde(rename(deserialize = "type"))]
     pub kind: Type,
     pub children: Option<Vec<Hierarchy>>,
 }
