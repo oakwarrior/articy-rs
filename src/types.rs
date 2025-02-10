@@ -408,6 +408,24 @@ pub struct Package {
     content = "properties"
 )]
 pub enum Model {
+    Instruction {
+        id: Id,
+        parent: Id,
+        technical_name: String,
+        display_name: String,
+        expression: String,
+
+        color: Color,
+        text: String,
+        external_id: Id,
+        position: Point,
+        size: Size,
+        z_index: f32,
+        short_id: ShortId,
+
+        input_pins: Vec<Pin>,
+        output_pins: Vec<Pin>,
+    },
     DialogueFragment {
         id: Id,
         parent: Id,
@@ -648,7 +666,8 @@ impl Model {
             | Model::Comment { id, .. }
             | Model::Condition { id, .. }
             | Model::UserFolder { id, .. }
-            | Model::Entity { id, .. } => id.clone(),
+            | Model::Entity { id, .. }
+            | Model::Instruction { id, .. } => id.clone(),
 
             Model::Custom(_, value) => match value.get("id") {
                 Some(value) => match value.as_str() {
@@ -669,7 +688,8 @@ impl Model {
             | Model::Comment { external_id, .. }
             | Model::Condition { external_id, .. }
             | Model::UserFolder { external_id, .. }
-            | Model::Entity { external_id, .. } => external_id.clone(),
+            | Model::Entity { external_id, .. }
+            | Model::Instruction { external_id, .. } => external_id.clone(),
 
             Model::Custom(_, value) => match value.get("external_id") {
                 Some(value) => match value.as_str() {
@@ -690,7 +710,8 @@ impl Model {
             | Model::Comment { parent, .. }
             | Model::Condition { parent, .. }
             | Model::Entity { parent, .. }
-            | Model::UserFolder { parent, .. } => parent.clone(),
+            | Model::UserFolder { parent, .. }
+            | Model::Instruction { parent, .. } => parent.clone(),
 
             Model::Custom(_, value) => match value.get("parent") {
                 Some(value) => match value.as_str() {
@@ -710,7 +731,8 @@ impl Model {
             | Model::Dialogue { text, .. }
             | Model::Comment { text, .. }
             | Model::Entity { text, .. }
-            | Model::Condition { text, .. } => Some(text.to_string()),
+            | Model::Condition { text, .. }
+            | Model::Instruction { text, .. } => Some(text.to_string()),
             Model::UserFolder { .. } | Model::Custom(..) => None,
         }
     }
@@ -721,7 +743,8 @@ impl Model {
             | Model::Hub { display_name, .. }
             | Model::Dialogue { display_name, .. }
             | Model::Entity { display_name, .. }
-            | Model::Condition { display_name, .. } => Some(display_name.to_string()),
+            | Model::Condition { display_name, .. }
+            | Model::Instruction { display_name, .. } => Some(display_name.to_string()),
 
             Model::DialogueFragment { .. }
             | Model::UserFolder { .. }
@@ -736,7 +759,8 @@ impl Model {
             | Model::DialogueFragment { input_pins, .. }
             | Model::Hub { input_pins, .. }
             | Model::Dialogue { input_pins, .. }
-            | Model::Condition { input_pins, .. } => Some(input_pins),
+            | Model::Condition { input_pins, .. }
+            | Model::Instruction { input_pins, .. } => Some(input_pins),
 
             Model::UserFolder { .. }
             | Model::Comment { .. }
@@ -751,7 +775,8 @@ impl Model {
             | Model::DialogueFragment { output_pins, .. }
             | Model::Hub { output_pins, .. }
             | Model::Dialogue { output_pins, .. }
-            | Model::Condition { output_pins, .. } => Some(output_pins),
+            | Model::Condition { output_pins, .. }
+            | Model::Instruction { output_pins, .. } => Some(output_pins),
 
             Model::UserFolder { .. }
             | Model::Entity { .. }

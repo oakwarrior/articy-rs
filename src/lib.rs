@@ -5,7 +5,10 @@ use std::rc::Rc;
 use types::{Error, File, Id, Model, Type};
 
 pub use evalexpr::Value as StateValue;
-use evalexpr::{eval_boolean_with_context, Context, ContextWithMutableVariables, HashMapContext};
+use evalexpr::{
+    eval_boolean_with_context, eval_with_context_mut, Context, ContextWithMutableVariables,
+    HashMapContext,
+};
 
 pub struct Interpreter {
     pub file: Rc<File>,
@@ -41,8 +44,8 @@ impl Interpreter {
             .ok_or(Error::FailedToSetState)
     }
 
-    pub fn get_state(&self, key: &str) -> Result<&StateValue, Error> {
-        self.state.get_value(key).ok_or(Error::FailedToGetState)
+    pub fn get_state(&self, key: &str) -> Option<&StateValue> {
+        self.state.get_value(key)
     }
 
     pub fn start<'a>(&mut self, id: Id) -> Result<(), Error> {
@@ -294,6 +297,30 @@ impl Interpreter {
 
                 self.post_advance()
             }
+
+            Model::Instruction {
+                expression,
+                output_pins,
+                ..
+            } => {
+                let result = eval_with_context_mut(&expression, &mut self.state);
+
+                println!("[Instruction] Input ({expression}); Outcome: {result:#?}");
+
+                self.cursor = Some(
+                    output_pins
+                        .first()
+                        .ok_or(Error::NoOutputConnected)?
+                        .connections
+                        .first()
+                        .ok_or(Error::NoOutputConnected)?
+                        .target
+                        .clone(),
+                );
+
+                self.post_advance()
+            }
+
             kind => unimplemented!("Forgot to implement type {kind:?} for Interpreter::advance"),
         }
     }
